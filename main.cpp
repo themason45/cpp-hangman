@@ -67,14 +67,16 @@ const char matrices[7][6][8] = {
 };
 
 std::string getWord() {
-    const char *words[5] = {"Hello", "Coffee", "Newspaper", "Animal", "Cheese"};
+    const int wordCount = 10;
+    const char *words[wordCount] = {"Hello", "Coffee", "Newspaper", "Animal", "Cheese", "Tree", "Window", "Glass",
+                                    "Breadboard", "Sink"};
 
     std::mt19937 mt(time(nullptr)); // NOLINT(cert-msc51-cpp)
-    std::uniform_int_distribution<int> dist(0, sizeof words);
-    
-    int idx = dist(mt);
-    std::string word = reinterpret_cast<const char *>(words[idx]);
+    std::uniform_int_distribution<int> dist(0, wordCount);
 
+    int idx = dist(mt);
+
+    std::string word = reinterpret_cast<const char *>(words[idx]);
     return word;
 }
 
@@ -100,39 +102,34 @@ std::string wordProgressDisplay(char *currentLetters, int nLetters) {
     return display;
 }
 
+bool valExists(const char arr[], int len, const std::string &val) {
+    bool passes = false;
+    for (char i : val) {
+        if (i == '/') continue;
+        if (std::find(arr, arr + len, i) != arr + len) passes = true;
+    }
+    return passes;
+}
+
 int main() {
-    int maxGuesses = 5;
+    // Set the globals
+    const int maxGuesses = 5;
     int nFailedGuesses = 0;
     int nCorrectGuesses = 0;
 
+    // Select a random word
     std::string word = getWord();
     int len = (int) word.length();
+
+    // Then create an array of the letters we have found so far ('/' is used as this won't show up in any of the words)
     char guessedLetters[len];
     for (int i = 0; i < len; ++i) {
         guessedLetters[i] = '/';
     }
 
+    // Start the main process loop
     while (true) {
-        std::cout << stickManProgressDisplay(&nFailedGuesses) << "\n";
-
-        if (maxGuesses - nFailedGuesses == 1) { std::cout << "You have 1 guess remaining. \n"; }
-        else { std::cout << "You have " << maxGuesses - nFailedGuesses << " guesses remaining. \n"; }
-
-        std::cout << "Current progress: " << wordProgressDisplay(guessedLetters, len) << "\n";
-        std::cout << "Enter your guess: ";
-
-        std::string guess;
-        std::cin >> guess;
-
-        size_t pos = word.find(guess);
-        if (pos != std::string::npos) {
-            for (int i = 0; i < guess.length(); ++i) guessedLetters[pos + i] = guess[i];
-            nCorrectGuesses += (int) guess.length();
-        } else {
-            std::cout << "Oops, wrong!\n";
-            nFailedGuesses++;
-        }
-
+        // Breakout cases at the start
         if (nCorrectGuesses == len) {
             nFailedGuesses = 6;
             std::cout << stickManProgressDisplay(&nFailedGuesses) << "\n";
@@ -141,8 +138,50 @@ int main() {
         }
         if (nFailedGuesses == maxGuesses) {
             std::cout << stickManProgressDisplay(&nFailedGuesses) << "\n";
-            std::cout << "You failed. Better luck next time :)";
+            std::cout << "You failed. Better luck next time :).\n The word was: " << word;
             break;
+        }
+
+        // Main display stuff
+        std::cout << stickManProgressDisplay(&nFailedGuesses) << "\n";
+
+        if (maxGuesses - nFailedGuesses == 1) { std::cout << "You have 1 guess remaining. \n"; }
+        else { std::cout << "You have " << maxGuesses - nFailedGuesses << " guesses remaining. \n"; }
+
+        std::cout << "Current progress: " << wordProgressDisplay(guessedLetters, len) << "\n";
+        std::cout << "Enter your guess: ";
+
+        // Take the guess
+        std::string guess;
+        std::cin >> guess;
+
+        // Check the letters of the guess haven't been used already
+        if (!valExists(guessedLetters, len, guess)) {
+
+            // For each letter within the guess, perform a check on it
+            for (char letter : guess) {
+                int rootPos = -1;
+                // Search through the whole length of the word to find a match
+                while (rootPos <= len) {
+                    size_t pos = word.find(letter, rootPos + 1);
+                    // Check that we're still at the root position, and if there are no matches, then break
+                    if (pos == std::string::npos && rootPos == -1) {
+                        std::cout << "Oops, wrong!\n";
+                        nFailedGuesses++;
+                        break;
+                    }
+
+                    if (pos != std::string::npos) {
+                        // When you find a match, set the base search pointer to that spot, to find repeated letters
+                        rootPos = (int) pos;
+                        guessedLetters[pos] = letter;
+                        nCorrectGuesses++;
+                        continue;
+                    }
+
+                    break;
+                }
+            }
         }
     }
 
